@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roman Uzay Teleskobu 3D</title>
+<style>
+:root{--bg:#04060d;--panel:rgba(10,14,26,.88);--line:rgba(140,170,220,.25);--txt:#e6ecf7;--mut:#9fb0cc;--acc:#39c6ff;--acc2:#ffc53d}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;display:block}
+#hud{position:fixed;top:14px;left:14px;display:flex;flex-direction:column;gap:8px;z-index:5;max-width:calc(100vw - 28px)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;backdrop-filter:blur(8px)}
+.title{font-weight:700;font-size:14px;letter-spacing:.04em;text-transform:uppercase}
+.title small{display:block;font-weight:400;color:var(--mut);text-transform:none;letter-spacing:0;font-size:12px;margin-top:2px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+button{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;transition:.15s;font-family:inherit}
+select{background:#0a0e1a;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px;font:inherit;font-size:12.5px}button:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button:hover{background:rgba(255,255,255,.14)}
+button.on{background:rgba(57,198,255,.22);border-color:var(--acc);color:#fff}
+button.warn.on{background:rgba(255,197,61,.22);border-color:var(--acc2)}
+label.sl{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut)}
+input[type=range]{width:150px;accent-color:var(--acc)}
+#tip{position:fixed;pointer-events:none;z-index:9;background:rgba(6,10,20,.92);border:1px solid var(--acc);color:#fff;padding:5px 9px;border-radius:7px;font-size:13px;white-space:nowrap;opacity:0;transform:translate(14px,14px);transition:opacity .12s}
+#tip.inner{border-color:var(--acc2)}
+#panel{position:fixed;top:0;right:0;height:100%;width:370px;max-width:92vw;background:var(--panel);border-left:1px solid var(--line);backdrop-filter:blur(10px);transform:translateX(105%);transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:6;overflow-y:auto;padding:18px 20px 30px}
+#panel.open{transform:none}
+#panel h2{margin:6px 0 2px;font-size:20px;padding-right:34px}
+#panel .sub{color:var(--acc);font-size:13px;margin-bottom:12px}
+#panel .sub.y{color:var(--acc2)}
+#panel p{line-height:1.55;font-size:14px;color:#d7dfee}
+#panel ul{padding-left:18px;margin:8px 0}
+#panel li{margin:5px 0;font-size:13.5px;line-height:1.45}
+#panel .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.08);color:var(--mut);margin-bottom:4px}
+#panel .tag.y{background:rgba(255,197,61,.15);color:var(--acc2)}
+#close{position:absolute;top:12px;right:12px;width:30px;height:30px;padding:0;border-radius:50%}
+#panel h4{margin:16px 0 4px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+#panel .act{margin-top:14px}
+#step{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:5;font-size:14px;padding:9px 16px;opacity:0;transition:opacity .3s;max-width:80vw;text-align:center;pointer-events:none}
+#step.show{opacity:1}
+#step b{color:var(--acc)}
+#step .y{color:var(--acc2)}
+#hint{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);color:var(--mut);font-size:12.5px;z-index:4;transition:opacity 1s;text-align:center;pointer-events:none}
+#load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:14px;z-index:20;background:var(--bg);transition:opacity .5s}
+.svgbox{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:10px;padding:8px;margin:10px 0}
+@media (max-width:700px){input[type=range]{width:110px}.title small{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="load">3D model yükleniyor…</div>
+<div id="hud">
+ <div class="card"><div class="title"><span id="heading">Nancy Grace Roman Uzay Teleskobu</span><small id="subtitle">İnteraktif 3D model · fareyi parçanın üstüne getir, tıkla, parçalara ayır</small></div></div>
+ <div class="card row">
+   <label class="sl"><span id="explodeLabel">Parçalara ayır</span> <input id="explode" type="range" min="0" max="100" value="0"></label>
+   <button id="bAssemble">Birleştir</button><button id="bExplode">Patlat</button>
+ </div>
+ <div class="card row">
+   <button id="bInside" class="warn">İçeri göz at</button>
+   <button id="bLight">Işık yolu: nasıl çalışır?</button>
+   <button id="bDims">Boyutlar</button>
+   <button id="bRot">Otomatik dön</button>
+   <button id="bReset">Görünümü sıfırla</button>
+   <button id="bL2">L2 yörüngesi</button>
+   <label class="sl"><span id="languageLabel">Dil</span><select id="language" aria-labelledby="languageLabel"><option value="tr" lang="tr">Türkçe</option><option value="en" lang="en">English</option></select></label>
+ </div>
+</div>
+<div id="tip"></div>
+<div id="step" class="card"></div>
+<div id="hint">Sürükle: döndür · Tekerlek: yakınlaştır · Sağ tık: kaydır · Parçanın üstüne gel: adı · Tıkla: ayrıntı</div>
+<aside id="panel"><button id="close" title="Kapat">✕</button><div id="pc"></div></aside>
+
+<script>
+// The interface loads independently of the 3D library, including on local files.
+window.romanI18n = (() => {
+ const messages = {
+ "tr": {
+  "title": "Roman Uzay Teleskobu 3D",
+  "heading": "Nancy Grace Roman Uzay Teleskobu",
+  "subtitle": "İnteraktif 3D model · fareyi parçanın üstüne getir, tıkla, parçalara ayır",
+  "load": "3D model yükleniyor…",
+  "explodeLabel": "Parçalara ayır",
+  "bAssemble": "Birleştir",
+  "bExplode": "Patlat",
+  "bInside": "İçeri göz at",
+  "bLight": "Işık yolu: nasıl çalışır?",
+  "bDims": "Boyutlar",
+  "bRot": "Otomatik dön",
+  "bReset": "Görünümü sıfırla",
+  "bL2": "L2 yörüngesi",
+  "hint": "Sürükle: döndür · Tekerlek: yakınlaştır · Sağ tık: kaydır · Parçanın üstüne gel: adı · Tıkla: ayrıntı",
+  "close": "Kapat",
+  "language": "Dil",
+  "canvas": "Roman Uzay Teleskobu interaktif 3D modeli",
+  "highlights": "Öne çıkanlar",
+  "inside": "İçine bak",
+  "light": "Işık yolunu göster",
+  "focus": "Kameraya al",
+  "sun": "Güneş",
+  "earth": "Dünya",
+  "halo": "L2 · halo yörünge",
+  "distance": "1,5 milyon km",
+  "dimensions": [
+   "Toplam uzunluk (açılmış): 12,7 m",
+   "Genişlik: 4,4 m",
+   "Birincil ayna: 2,4 m"
+  ]
+ },
+ "en": {
+  "title": "Roman Space Telescope 3D",
+  "heading": "Nancy Grace Roman Space Telescope",
+  "subtitle": "Interactive 3D model · hover over a part, click it, or explore the exploded view",
+  "load": "Loading 3D model…",
+  "explodeLabel": "Exploded view",
+  "bAssemble": "Assemble",
+  "bExplode": "Explode",
+  "bInside": "Look inside",
+  "bLight": "Light path: how does it work?",
+  "bDims": "Dimensions",
+  "bRot": "Auto-rotate",
+  "bReset": "Reset view",
+  "bL2": "L2 orbit",
+  "hint": "Drag: rotate · Scroll: zoom · Right-drag: pan · Hover over a part: name · Click: details",
+  "close": "Close",
+  "language": "Language",
+  "canvas": "Interactive 3D model of the Roman Space Telescope",
+  "highlights": "Key facts",
+  "inside": "Look inside",
+  "light": "Show light path",
+  "focus": "Focus camera",
+  "sun": "Sun",
+  "earth": "Earth",
+  "halo": "L2 · halo orbit",
+  "distance": "1.5 million km",
+  "dimensions": [
+   "Overall length (deployed): 12.7 m",
+   "Width: 4.4 m",
+   "Primary mirror: 2.4 m"
+  ]
+ }
+};
+ let language = 'tr';
+ try { const saved = localStorage.getItem('roman-language'); if (saved === 'tr' || saved === 'en') language = saved; } catch {}
+ function apply(next) {
+  if (!Object.hasOwn(messages, next)) return;
+  language = next;
+  const t = messages[language];
+  document.documentElement.lang = language;
+  document.title = t.title;
+  for (const id of ['heading','subtitle','load','explodeLabel','bAssemble','bExplode','bInside','bLight','bDims','bRot','bReset','bL2','hint']) {
+   const el = document.getElementById(id); if (el) el.textContent = t[id];
+  }
+  document.getElementById('languageLabel').textContent = t.language;
+  document.getElementById('language').value = language;
+  document.getElementById('close').title = t.close;
+  document.getElementById('close').setAttribute('aria-label', t.close);
+  document.getElementById('c').setAttribute('aria-label', t.canvas);
+  try { localStorage.setItem('roman-language', language); } catch {}
+  window.dispatchEvent(new Event('roman-languagechange'));
+ }
+ document.getElementById('language').addEventListener('change', e => apply(e.target.value));
+ apply(language);
+ return {get language(){return language;}, get ui(){return messages[language];}};
+})();
+</script>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ---------------- PARÇA BİLGİLERİ ---------------- */
+const INFO_TR={
+sunshield:{name:'Güneş Kalkanı ve Işık Siperi',sub:'Parazit ışığı engeller',layer:'Dış parça',
+ desc:'Teleskobun ön ucundaki büyük, eğik panel. Güneş, Dünya ve Ay\'dan gelen ışığın tüpe sızmasını engeller. Kızılötesi gözlem için optiklerin soğuk ve karanlık kalması şarttır; kalkan hem ışığı hem de ısıyı keser.',
+ facts:['Görseldeki en dıştaki, sola doğru uzanan koyu panel','Çok katmanlı yalıtım folyosu ile kaplıdır','Teleskop her zaman Güneş\'e belirli bir açı aralığında bakacak şekilde yönlendirilir; kalkan bu geometriye göre tasarlanmıştır']},
+barrel:{name:'Teleskop Tüpü (Bafıl)',sub:'Optikleri sarar ve karanlık tutar',layer:'Dış parça · içi görülebilir',
+ desc:'Optikleri saran siyah silindir. İç yüzeyi ışığı yutan mat siyah kaplamayla kaplıdır, böylece istenmeyen yansımalar dedektörlere ulaşmaz. İçinde birincil ve ikincil aynalar bulunur. Aynaları görmek için "İçeri göz at" modunu aç.',
+ facts:['Ön ucu açıktır: yıldız ışığı buradan girer','İç yüzeydeki halkalar (bafıllar) eğik gelen ışığı tuzaklar','Optik teleskop düzeneği (OTA) olarak adlandırılır']},
+truss:{name:'Kafes Yapı',sub:'Optik hizayı korur',layer:'Dış parça',
+ desc:'Teleskop tüpü, alet modülü ve gövdeyi birbirine bağlayan hafif kafes. Sıcaklık değişimlerinde bile aynalar ile aletler arasındaki mesafeyi mikron hassasiyetinde sabit tutmak için düşük ısıl genleşmeli kompozit malzemeden yapılmıştır.',
+ facts:['Aynalar ve aletler arasındaki mesafeyi sabit tutar','Güneş panellerinin bağlantı noktasıdır']},
+primary:{name:'Birincil Ayna',sub:'2,4 m · Işığı toplar ve odaklar',layer:'İç parça',
+ desc:'Teleskobun kalbi. 2,4 metre çapındaki içbükey ayna, gelen paralel yıldız ışığını toplayıp öne, ikincil aynaya doğru yansıtır. Ortasındaki delik, ikincil aynadan dönen ışığın arkadaki aletlere geçmesini sağlar. Hubble ile aynı çapta olmasına karşın çok daha hafiftir.',
+ facts:['Çap: 2,4 m','Yüzeyi gümüş kaplamadır; kızılötesi yansıtıcılığı yüksektir','Kütlesi yaklaşık 186 kg, Hubble aynasının dörtte biri','Cassegrain düzeninin ilk yansıma noktası']},
+secondary:{name:'İkincil Ayna ve Örümcek Destek',sub:'Işığı birincil aynanın deliğinden geri yansıtır',layer:'İç parça',
+ desc:'Tüpün ön ucunda, üç kollu örümcek destekle tutulan küçük dışbükey ayna. Birincil aynadan gelen yakınsayan ışığı alır ve birincil aynanın ortasındaki delikten geriye, alet modülüne odaklar.',
+ facts:['Cassegrain düzeninin ikinci yansıması','Örümcek kolları görüntülerde yıldızların çevresindeki ışın izlerine neden olur','Altı serbestlik dereceli mekanizma ile odak ayarı yapılır']},
+wfi:{name:'Geniş Alan Aleti (WFI)',sub:'300 megapiksel kızılötesi kamera',layer:'Dış parça · içi görülebilir',
+ desc:'Roman\'ın ana bilimsel aleti. Hubble\'ın 100 katı genişlikte bir gökyüzü alanını tek karede, Hubble kalitesinde görüntüler. Karanlık enerji, karanlık madde ve ötegezegen araştırmalarının çoğu bu kamerayla yapılır. Kutunun içindeki dedektör mozaiğini görmek için "İçeri göz at" modunu aç.',
+ facts:['Çözünürlük: 300,8 megapiksel','Görüş alanı: 0,28 kare derece (Hubble\'ın yaklaşık 100 katı)','Dalga boyu: 0,48 - 2,3 mikron (görünür ve yakın kızılötesi)','Filtre ve prizma çarkı ile spektroskopi de yapabilir','Üstteki gümüş plaka radyatördür: dedektörleri soğuk tutmak için ısıyı uzaya atar','Mavi ışık yolu bu alete gider']},
+wfi_detector:{name:'WFI Dedektör Mozaiği',sub:'18 kızılötesi dedektör · kesit görünümü',layer:'İç parça',
+ desc:'Görseldeki mavi-mor kare dizisi. 18 adet H4RG-10 kızılötesi dedektör 6 x 3 düzeninde yerleştirilmiştir. Her dedektör 4096 x 4096 piksel; toplamı 300 megapikseli aşar. Işık, ikincil aynadan geldikten sonra bu yüzeye düşer ve elektrik sinyaline dönüşür.',
+ facts:['18 dedektör, her biri 16,8 megapiksel','Piksel boyutu 10 mikron','Yaklaşık -178 °C (95 K) sıcaklıkta çalışır','Cıva-kadmiyum-tellür (HgCdTe) yarı iletken teknolojisi']},
+cgi:{name:'Koronagraf Aleti (CGI)',sub:'Teknoloji gösterimi · ötegezegen görüntüleme',layer:'Dış parça · içi görülebilir',
+ desc:'Yıldızın parlak ışığını bastırıp yanındaki çok sönük gezegenleri doğrudan görüntülemeyi hedefleyen alet. Yıldız, gezegenden milyarlarca kat parlaktır; CGI bu ışığı maskeler ve deforme edilebilir aynalarla kalan dalga cephesi hatalarını düzeltir. Gelecek nesil teleskopların teknolojisini uzayda ilk kez dener. İçindeki optik tezgahı görmek için "İçeri göz at" modunu aç.',
+ facts:['Kontrast hedefi: yaklaşık 1e-8 (yıldızdan 100 milyon kat sönük cisimler)','İki deforme edilebilir ayna: DM1 ve DM2','Uzayda aktif dalga cephesi kontrolü yapan ilk koronagraf','Sarı ışık yolu bu alete gider']},
+cgi_dm1:{name:'Deforme Edilebilir Ayna 1 (DM1)',sub:'Dalga cephesi düzeltme',layer:'İç parça',
+ desc:'Yüzeyi 48 x 48 = 2304 küçük piston (aktüatör) ile nanometre hassasiyetinde şekillendirilebilen ayna. Optiklerdeki kusurların ve titreşimlerin yarattığı bozulmayı gerçek zamanlı olarak düzelterek yıldızın ışığını "karanlık delik" bölgesinden temizler.',
+ facts:['2304 aktüatör','Hareket hassasiyeti nanometre altı','DM2 ile birlikte çalışır']},
+cgi_dm2:{name:'Deforme Edilebilir Ayna 2 (DM2)',sub:'Dalga cephesi düzeltme',layer:'İç parça',
+ desc:'İkinci deforme edilebilir ayna. DM1 ile farklı bir optik düzlemde durur; bu sayede hem genlik hem de faz hatalarını düzeltebilirler. İki aynanın birlikte kullanımı, tek aynayla ulaşılamayan kontrast seviyelerini mümkün kılar.',
+ facts:['2304 aktüatör','DM1 ile eşli çalışır','Görüntü düzleminde karanlık bölge oluşturur']},
+cgi_optics:{name:'CGI Optik Tezgahı',sub:'Maskeler, lensler ve kamera',layer:'İç parça',
+ desc:'Maskelerin, lenslerin, filtrelerin ve kameraların monte edildiği sert plaka. Işık DM1 ve DM2 üzerinden yansıyıp odak düzlemi maskesi ve Lyot durdurucusuna gider; en sonda tek fotonları sayabilen düşük gürültülü EMCCD kameraya ulaşır.',
+ facts:['Odak düzlemi maskesi yıldızı kapatır','Lyot durdurucu kırınım halkalarını keser','EMCCD kamera tek fotonları sayabilir']},
+bus:{name:'Uzay Aracı Gövdesi (Bus)',sub:'Güç, itki, iletişim',layer:'Dış parça · içi görülebilir',
+ desc:'Teleskobun yaşam destek ünitesi. Güneş panellerinden gelen elektriği dağıtır, yönelim kontrolü yapar, yörüngeyi korur ve verileri Dünya\'ya gönderir. İçindeki yakıt tankını ve tepki tekerleklerini görmek için "İçeri göz at" modunu aç.',
+ facts:['NASA Goddard Uzay Uçuş Merkezi tarafından yapıldı','Altıgen yapı, çok katmanlı altın renkli yalıtımla kaplı','Yönelim: yıldız izleyiciler + jiroskoplar + tepki tekerlekleri','Toplam teleskop kütlesi yaklaşık 4,2 ton','Görev süresi: 5 yıl (10 yıla uzatılabilir)']},
+bus_tank:{name:'Yakıt Tankı',sub:'Hidrazin',layer:'İç parça',
+ desc:'Hidrazin yakıt tankı. Roman\'ın küçük itici motorları L2 çevresindeki halo yörüngesini korumak (istasyon tutma) ve tepki tekerleklerinde biriken momentumu boşaltmak için kullanılır.',
+ facts:['Tek bileşenli hidrazin iticiler','Yörünge düzeltme manevraları için yeterli yakıt taşır']},
+bus_wheels:{name:'Tepki Tekerlekleri',sub:'Yakıtsız yönelim kontrolü',layer:'İç parça',
+ desc:'Hızla dönen ağır diskler. Birinin hızı değiştiğinde teleskop ters yönde döner. Böylece yakıt harcamadan teleskop hedefe çevrilir ve gözlem sırasında milisaniye yay hassasiyetiyle sabit tutulur.',
+ facts:['Yakıt harcamadan döndürme','Titreşimleri en aza indirecek şekilde yalıtılmıştır']},
+antenna:{name:'Yüksek Kazançlı Anten',sub:'Veri iletişimi',layer:'Dış parça',
+ desc:'Yönlendirilebilir çanak anten. WFI\'nin ürettiği devasa veri hacmini Ka bandında Dünya\'ya gönderir. Roman, kendinden önceki teleskoplardan çok daha hızlı veri iletir.',
+ facts:['Ka bandı, yaklaşık 500 Mbit/s','Günde yaklaşık 11 terabit (1,4 TB) veri','Dünya ile mesafe 1,5 milyon km']},
+solar:{name:'Güneş Panelleri',sub:'Elektrik üretir',layer:'Dış parça',
+ desc:'Gövdenin altında sıralanmış beş panel. Roman uzayda Güneş\'e dönük tarafını bu panellerle kaplar; paneller aynı zamanda gövdeyi gölgeleyerek soğuk kalmasına yardım eder.',
+ facts:['Beş katı panel, fırlatmada katlı, yörüngede açılır','Teleskobun tüm elektriğini sağlar','Güneş kalkanı ile birlikte ısıl koruma görevi de görür']},
+l2:{name:'Güneş - Dünya L2 Noktası',sub:'Halo yörünge · Dünya\'dan 1,5 milyon km',layer:'Yörünge',
+ desc:'Roman, Dünya\'nın Güneş\'e göre tam arka tarafında, 1,5 milyon km uzaktaki Lagrange 2 noktası çevresinde halo yörüngede dolanır. Burada Güneş, Dünya ve Ay hep aynı tarafta kalır; teleskop tek bir kalkanla üçünü de engelleyip gökyüzünün büyük kısmını sürekli gözleyebilir.',
+ facts:['Dünya ile birlikte Güneş çevresinde dolanır','Kararlı sıcaklık, kesintisiz güneş enerjisi','James Webb ve Gaia da aynı bölgede','Planlanan fırlatma: en erken 2026 sonbaharı, en geç Mayıs 2027 (Falcon Heavy)']}
+};
+const INFO_EN={
+ "sunshield": {
+  "name": "Sunshield and Light Baffle",
+  "sub": "Blocks stray light",
+  "layer": "External component",
+  "desc": "The large, angled panel at the front of the telescope. It prevents light from the Sun, Earth, and Moon from entering the tube. Infrared observations require the optics to stay cold and dark; the shield blocks both light and heat.",
+  "facts": [
+   "The outermost dark panel extending to the left in the model",
+   "Covered with multilayer insulation foil",
+   "The telescope is always oriented within a specific range of angles relative to the Sun; the shield is designed for this geometry"
+  ]
+ },
+ "barrel": {
+  "name": "Telescope Tube (Baffle)",
+  "sub": "Encloses the optics and keeps them dark",
+  "layer": "External component · interior view available",
+  "desc": "The black cylinder surrounding the optics. Its interior has a matte black, light-absorbing coating that prevents unwanted reflections from reaching the detectors. It contains the primary and secondary mirrors. Enable “Look inside” to see the mirrors.",
+  "facts": [
+   "The front end is open: starlight enters here",
+   "Internal rings (baffles) trap light arriving at oblique angles",
+   "Referred to as the Optical Telescope Assembly (OTA)"
+  ]
+ },
+ "truss": {
+  "name": "Truss Structure",
+  "sub": "Maintains optical alignment",
+  "layer": "External component",
+  "desc": "The lightweight framework connecting the telescope tube, instrument module, and spacecraft bus. It is made from composite materials with low thermal expansion to keep the distance between the mirrors and instruments constant to micrometer precision, even as temperatures change.",
+  "facts": [
+   "Maintains the spacing between the mirrors and instruments",
+   "Provides attachment points for the solar panels"
+  ]
+ },
+ "primary": {
+  "name": "Primary Mirror",
+  "sub": "2.4 m · Collects and focuses light",
+  "layer": "Internal component",
+  "desc": "The heart of the telescope. This concave mirror, 2.4 meters in diameter, collects incoming parallel starlight and reflects it forward toward the secondary mirror. The hole at its center lets light returning from the secondary mirror pass through to the instruments behind it. Although it has the same diameter as Hubble’s mirror, it is much lighter.",
+  "facts": [
+   "Diameter: 2.4 m",
+   "Silver-coated surface with high infrared reflectivity",
+   "Mass: approximately 186 kg, one quarter of Hubble’s mirror mass",
+   "The first reflection in the Cassegrain optical layout"
+  ]
+ },
+ "secondary": {
+  "name": "Secondary Mirror and Spider Support",
+  "sub": "Reflects light back through the primary mirror’s central hole",
+  "layer": "Internal component",
+  "desc": "The small convex mirror at the front of the tube, held by a three-armed spider support. It receives the converging light from the primary mirror and focuses it back through the hole at the center of the primary mirror, toward the instrument module.",
+  "facts": [
+   "The second reflection in the Cassegrain optical layout",
+   "The spider arms produce diffraction spikes around stars in images",
+   "A mechanism with six degrees of freedom adjusts the focus"
+  ]
+ },
+ "wfi": {
+  "name": "Wide Field Instrument (WFI)",
+  "sub": "300-megapixel infrared camera",
+  "layer": "External component · interior view available",
+  "desc": "Roman’s main science instrument. In a single exposure, it images an area of sky 100 times larger than Hubble’s field of view, with Hubble-quality imaging. Most dark energy, dark matter, and exoplanet research is carried out with this camera. Enable “Look inside” to see the detector mosaic inside the housing.",
+  "facts": [
+   "Resolution: 300.8 megapixels",
+   "Field of view: 0.28 square degrees (approximately 100 times Hubble’s)",
+   "Wavelength range: 0.48–2.3 microns (visible and near-infrared)",
+   "A filter and prism wheel also enables spectroscopy",
+   "The silver plate on top is a radiator: it releases heat into space to keep the detectors cold",
+   "The blue light path leads to this instrument"
+  ]
+ },
+ "wfi_detector": {
+  "name": "WFI Detector Mosaic",
+  "sub": "18 infrared detectors · cutaway view",
+  "layer": "Internal component",
+  "desc": "The array of blue-purple squares in the model. Eighteen H4RG-10 infrared detectors are arranged in a 6 × 3 grid. Each detector has 4096 × 4096 pixels, bringing the total to more than 300 megapixels. After arriving from the secondary mirror, light falls on this surface and is converted into electrical signals.",
+  "facts": [
+   "18 detectors, each with 16.8 megapixels",
+   "Pixel size: 10 microns",
+   "Operates at approximately −178 °C (95 K)",
+   "Mercury cadmium telluride (HgCdTe) semiconductor technology"
+  ]
+ },
+ "cgi": {
+  "name": "Coronagraph Instrument (CGI)",
+  "sub": "Technology demonstration · exoplanet imaging",
+  "layer": "External component · interior view available",
+  "desc": "An instrument designed to suppress a star’s bright light and directly image much fainter planets beside it. A star is billions of times brighter than a planet; CGI masks this light and uses deformable mirrors to correct the remaining wavefront errors. It tests technology for next-generation telescopes in space for the first time. Enable “Look inside” to see its optical bench.",
+  "facts": [
+   "Target contrast: approximately 1e-8 (objects 100 million times fainter than the star)",
+   "Two deformable mirrors: DM1 and DM2",
+   "The first coronagraph to use active wavefront control in space",
+   "The yellow light path leads to this instrument"
+  ]
+ },
+ "cgi_dm1": {
+  "name": "Deformable Mirror 1 (DM1)",
+  "sub": "Wavefront correction",
+  "layer": "Internal component",
+  "desc": "A mirror whose surface can be shaped with nanometer precision using 48 × 48 = 2304 tiny pistons (actuators). It corrects distortions caused by optical imperfections and vibrations in real time, clearing starlight from the “dark hole” region.",
+  "facts": [
+   "2304 actuators",
+   "Sub-nanometer positioning precision",
+   "Works together with DM2"
+  ]
+ },
+ "cgi_dm2": {
+  "name": "Deformable Mirror 2 (DM2)",
+  "sub": "Wavefront correction",
+  "layer": "Internal component",
+  "desc": "The second deformable mirror. It sits in a different optical plane from DM1, allowing the pair to correct both amplitude and phase errors. Using the two mirrors together enables contrast levels that a single mirror cannot achieve.",
+  "facts": [
+   "2304 actuators",
+   "Works in tandem with DM1",
+   "Creates a dark region in the image plane"
+  ]
+ },
+ "cgi_optics": {
+  "name": "CGI Optical Bench",
+  "sub": "Masks, lenses, and camera",
+  "layer": "Internal component",
+  "desc": "The rigid plate on which the masks, lenses, filters, and cameras are mounted. Light reflects off DM1 and DM2, then travels to the focal-plane mask and Lyot stop. Finally, it reaches a low-noise EMCCD camera capable of counting individual photons.",
+  "facts": [
+   "The focal-plane mask blocks the star",
+   "The Lyot stop blocks diffraction rings",
+   "The EMCCD camera can count individual photons"
+  ]
+ },
+ "bus": {
+  "name": "Spacecraft Bus",
+  "sub": "Power, propulsion, and communications",
+  "layer": "External component · interior view available",
+  "desc": "The telescope’s support platform. It distributes electricity from the solar panels, controls the spacecraft’s orientation, maintains its orbit, and sends data to Earth. Enable “Look inside” to see the propellant tank and reaction wheels inside.",
+  "facts": [
+   "Built by NASA’s Goddard Space Flight Center",
+   "Hexagonal structure covered with gold-colored multilayer insulation",
+   "Attitude control: star trackers + gyroscopes + reaction wheels",
+   "Total telescope mass: approximately 4.2 metric tons",
+   "Mission duration: 5 years (extendable to 10 years)"
+  ]
+ },
+ "bus_tank": {
+  "name": "Propellant Tank",
+  "sub": "Hydrazine",
+  "layer": "Internal component",
+  "desc": "The hydrazine propellant tank. Roman’s small thrusters are used to maintain its halo orbit around L2 (station-keeping) and unload angular momentum accumulated in the reaction wheels.",
+  "facts": [
+   "Monopropellant hydrazine thrusters",
+   "Carries sufficient propellant for orbit-correction maneuvers"
+  ]
+ },
+ "bus_wheels": {
+  "name": "Reaction Wheels",
+  "sub": "Propellant-free attitude control",
+  "layer": "Internal component",
+  "desc": "Heavy disks that spin rapidly. When the speed of a wheel changes, the telescope rotates in the opposite direction. This points the telescope at its target without using propellant and holds it steady with milliarcsecond precision during observations.",
+  "facts": [
+   "Rotate the spacecraft without consuming propellant",
+   "Isolated to minimize vibrations"
+  ]
+ },
+ "antenna": {
+  "name": "High-Gain Antenna",
+  "sub": "Data communications",
+  "layer": "External component",
+  "desc": "The steerable dish antenna. It transmits the enormous volume of data produced by WFI to Earth in the Ka band. Roman transmits data much faster than earlier telescopes.",
+  "facts": [
+   "Ka band, approximately 500 Mbit/s",
+   "Approximately 11 terabits (1.4 TB) of data per day",
+   "Distance from Earth: 1.5 million km"
+  ]
+ },
+ "solar": {
+  "name": "Solar Panels",
+  "sub": "Generate electricity",
+  "layer": "External component",
+  "desc": "The five panels arranged beneath the spacecraft bus. These panels cover Roman’s Sun-facing side in space; they also shade the bus to help keep it cool.",
+  "facts": [
+   "Five rigid panels, folded for launch and deployed in orbit",
+   "Supply all of the telescope’s electrical power",
+   "Also provide thermal protection together with the sunshield"
+  ]
+ },
+ "l2": {
+  "name": "Sun–Earth L2 Point",
+  "sub": "Halo orbit · 1.5 million km from Earth",
+  "layer": "Orbit",
+  "desc": "Roman travels in a halo orbit around the second Lagrange point, 1.5 million km beyond Earth on the side opposite the Sun. Here, the Sun, Earth, and Moon remain on the same side of the telescope; a single shield can block all three, allowing continuous observation of much of the sky.",
+  "facts": [
+   "Orbits the Sun together with Earth",
+   "Stable temperatures and uninterrupted solar power",
+   "James Webb and Gaia are also in this region",
+   "Planned launch: no earlier than fall 2026 and no later than May 2027 (Falcon Heavy)"
+  ]
+ }
+};
+const i18n=window.romanI18n;
+let INFO=i18n.language==='en'?INFO_EN:INFO_TR;
+const isInner=id=>INFO_TR[id].layer==='İç parça';
+const L2SVG=()=>`<div class="svgbox"><svg viewBox="0 0 320 110" width="100%"><defs><radialGradient id="g1"><stop offset="0" stop-color="#fff2b0"/><stop offset="1" stop-color="#f2a300"/></radialGradient></defs>
+<circle cx="40" cy="55" r="18" fill="url(#g1)"/><text x="40" y="92" fill="#cfd8ea" font-size="11" text-anchor="middle">${i18n.ui.sun}</text>
+<line x1="60" y1="55" x2="150" y2="55" stroke="#8fa4c8" stroke-dasharray="4 4"/>
+<circle cx="165" cy="55" r="9" fill="#3b7dd8"/><text x="165" y="92" fill="#cfd8ea" font-size="11" text-anchor="middle">${i18n.ui.earth}</text>
+<line x1="176" y1="55" x2="245" y2="55" stroke="#8fa4c8" stroke-dasharray="4 4"/>
+<ellipse cx="262" cy="55" rx="22" ry="30" fill="none" stroke="#39c6ff" stroke-dasharray="3 3"/><circle cx="262" cy="55" r="2" fill="#fff"/>
+<rect x="278" y="35" width="8" height="5" fill="#ddd" transform="rotate(-25 282 37)"/>
+<text x="262" y="14" fill="#39c6ff" font-size="11" text-anchor="middle">${i18n.ui.halo}</text>
+<text x="212" y="70" fill="#9fb0cc" font-size="9" text-anchor="middle">${i18n.ui.distance}</text></svg></div>`;
+
+/* ---------------- SAHNE ---------------- */
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+const scene=new THREE.Scene();
+const pmrem=new THREE.PMREMGenerator(renderer);
+scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+const camera=new THREE.PerspectiveCamera(42,1,0.1,900);
+const HOME_POS=new THREE.Vector3(7.5,4.6,14), HOME_TGT=new THREE.Vector3(-0.3,-0.4,0);
+camera.position.copy(HOME_POS);
+const controls=new OrbitControls(camera,canvas);
+controls.enableDamping=true; controls.dampingFactor=.08; controls.maxDistance=70; controls.minDistance=1.5;
+controls.target.copy(HOME_TGT); controls.autoRotateSpeed=0.8;
+
+scene.add(new THREE.HemisphereLight(0x8fb3ff,0x0a0c14,0.35));
+const sun=new THREE.DirectionalLight(0xfff2dc,2.2); sun.position.set(-40,26,18); scene.add(sun);
+const fill=new THREE.DirectionalLight(0x6fa0ff,0.45); fill.position.set(20,-10,-20); scene.add(fill);
+
+// yıldızlar
+{ const n=5000,pos=new Float32Array(n*3),v=new THREE.Vector3();
+  for(let i=0;i<n;i++){v.randomDirection().multiplyScalar(300+Math.random()*150);pos[i*3]=v.x;pos[i*3+1]=v.y;pos[i*3+2]=v.z;}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:1.4,transparent:true,opacity:.85}))); }
+// güneş parlaması
+function glowTex(inner,outer){const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  const g=x.createRadialGradient(128,128,0,128,128,128);g.addColorStop(0,inner);g.addColorStop(.25,inner);g.addColorStop(1,outer);
+  x.fillStyle=g;x.fillRect(0,0,256,256);return new THREE.CanvasTexture(c);}
+{ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex('rgba(255,245,215,1)','rgba(255,180,60,0)'),transparent:true,depthWrite:false}));
+  s.position.copy(sun.position).normalize().multiplyScalar(380); s.scale.set(90,90,1); scene.add(s); }
+// uzak Dünya
+{ const e=new THREE.Mesh(new THREE.SphereGeometry(28,48,48),new THREE.MeshStandardMaterial({color:0x2e6fd6,roughness:.9,emissive:0x0a2a66,emissiveIntensity:.4}));
+  e.position.set(-300,-390,-480); scene.add(e); }
+
+/* ---------------- MALZEMELER ---------------- */
+const M={
+ gold:()=>new THREE.MeshStandardMaterial({color:0xc9a04a,metalness:.85,roughness:.32}),
+ goldDk:()=>new THREE.MeshStandardMaterial({color:0x9a7a30,metalness:.85,roughness:.4}),
+ silver:()=>new THREE.MeshStandardMaterial({color:0xb9c0c8,metalness:.9,roughness:.35}),
+ foil:()=>new THREE.MeshStandardMaterial({color:0xd0d5db,metalness:.95,roughness:.28}),
+ black:()=>new THREE.MeshStandardMaterial({color:0x14151a,metalness:.25,roughness:.85,side:THREE.DoubleSide}),
+ dark:()=>new THREE.MeshStandardMaterial({color:0x2a2d36,metalness:.5,roughness:.6}),
+ mirror:()=>new THREE.MeshStandardMaterial({color:0xe8edf3,metalness:1,roughness:.06}),
+ dm:()=>new THREE.MeshStandardMaterial({color:0xcfd8ff,metalness:1,roughness:.1}),
+ panel:()=>new THREE.MeshStandardMaterial({color:0x1a2c66,metalness:.6,roughness:.35}),
+ chip:()=>new THREE.MeshStandardMaterial({color:0x5a3fb8,metalness:.7,roughness:.3,emissive:0x2a1c66,emissiveIntensity:.35}),
+ strut:()=>new THREE.MeshStandardMaterial({color:0xaab2ba,metalness:.8,roughness:.4}),
+};
+
+/* ---------------- KAYIT / GRUPLAR ---------------- */
+const parts={}, shells=[], shellEdges=[], explodeGroups=[];
+function reg(mesh,id,layer='outer',shell=false){
+  mesh.userData={partId:id,layer,shell};
+  (parts[id]??={meshes:[]}).meshes.push(mesh);
+  const m=mesh.material; m.userData.em=m.emissive.getHex(); m.userData.emi=m.emissiveIntensity;
+  if(shell){ shells.push(mesh);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry,25),new THREE.LineBasicMaterial({color:0x7fc4ff,transparent:true,opacity:.45}));
+    e.visible=false; mesh.add(e); shellEdges.push(e); }
+  return mesh;
+}
+function eg(base,off){const g=new THREE.Group();g.position.copy(base);g.userData.base=base.clone();g.userData.off=off.clone();scene.add(g);explodeGroups.push(g);return g;}
+function strut(g,a,b,r=0.03,mat=M.strut,id='truss'){
+  const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A),L=d.length();
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,L,8),mat());
+  m.position.copy(A).add(B).multiplyScalar(.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
+  g.add(reg(m,id)); return m;
+}
+
+/* ---------------- TÜP ---------------- */
+const gBarrel=eg(new THREE.Vector3(0,0,0),new THREE.Vector3(-1.9,0,0));
+{ const cyl=new THREE.Mesh(new THREE.CylinderGeometry(1.55,1.55,5.2,64,1,true).rotateZ(Math.PI/2),M.black());
+  cyl.position.x=-2.4; gBarrel.add(reg(cyl,'barrel','outer',true));
+  for(const x of [-5.0,0.2]){const t=new THREE.Mesh(new THREE.TorusGeometry(1.55,.06,12,64).rotateY(Math.PI/2),M.silver());t.position.x=x;gBarrel.add(reg(t,'barrel'));}
+  for(const x of [-4.0,-3.0,-2.0,-1.0]){const r=new THREE.Mesh(new THREE.RingGeometry(1.28,1.55,64).rotateY(Math.PI/2),M.black());r.position.x=x;gBarrel.add(reg(r,'barrel','outer',true));}
+  const bulk=new THREE.Mesh(new THREE.RingGeometry(0.45,1.55,64).rotateY(Math.PI/2),M.dark()); bulk.material.side=THREE.DoubleSide; bulk.position.x=0.15; gBarrel.add(reg(bulk,'barrel','outer',true));
+  // dış folyo şeritleri
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const s=new THREE.Mesh(new THREE.BoxGeometry(5.0,.05,.25),M.foil());s.position.set(-2.4,Math.cos(a)*1.57,Math.sin(a)*1.57);s.rotation.x=-a;gBarrel.add(reg(s,'barrel'));}
+}
+
+/* ---------------- BİRİNCİL AYNA ---------------- */
+const gPrimary=eg(new THREE.Vector3(-0.55,0,0),new THREE.Vector3(-0.6,0,0));
+let primaryMesh;
+{ const sh=new THREE.Shape(); sh.absarc(0,0,1.2,0,Math.PI*2,false);
+  const hole=new THREE.Path(); hole.absarc(0,0,0.28,0,Math.PI*2,true); sh.holes.push(hole);
+  const geo=new THREE.ExtrudeGeometry(sh,{depth:.16,bevelEnabled:true,bevelSize:.03,bevelThickness:.03,curveSegments:64}).rotateY(Math.PI/2);
+  primaryMesh=new THREE.Mesh(geo,M.mirror()); gPrimary.add(reg(primaryMesh,'primary','both'));
+  const back=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.0,.3,48).rotateZ(Math.PI/2),M.dark()); back.position.x=.35; gPrimary.add(reg(back,'primary','both'));
+  const hub=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.7,32).rotateZ(Math.PI/2),M.dark()); hub.position.x=.35; hub.material.side=THREE.DoubleSide; gPrimary.add(reg(hub,'primary','both'));
+}
+
+/* ---------------- İKİNCİL AYNA ---------------- */
+const gSecondary=eg(new THREE.Vector3(-4.3,0,0),new THREE.Vector3(-3.3,0,0));
+let secondaryMesh;
+{ secondaryMesh=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.08,48).rotateZ(Math.PI/2),M.mirror()); gSecondary.add(reg(secondaryMesh,'secondary','both'));
+  const hous=new THREE.Mesh(new THREE.CylinderGeometry(.37,.3,.35,48).rotateZ(Math.PI/2),M.dark()); hous.position.x=-.2; gSecondary.add(reg(hous,'secondary','both'));
+  for(let i=0;i<3;i++){const a=Math.PI/2+i*Math.PI*2/3; strut(gSecondary,[-.15,0,0],[-.15,Math.cos(a)*1.52,Math.sin(a)*1.52],.025,M.dark,'secondary').userData.layer='both';}
+}
+
+/* ---------------- GÜNEŞ KALKANI ---------------- */
+const gShield=eg(new THREE.Vector3(-5.9,2.0,0),new THREE.Vector3(-2.6,1.9,0));
+{ const top=new THREE.Mesh(new THREE.BoxGeometry(4.6,.06,3.3),M.black()); top.material.side=THREE.FrontSide; top.material.color.set(0x0d0e12);
+  const under=new THREE.Mesh(new THREE.BoxGeometry(4.55,.05,3.25),M.foil()); under.position.y=-.06;
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(4.7,.12,.12),M.silver()); frame.position.set(0,-.03,1.62);
+  const frame2=frame.clone(); frame2.material=M.silver(); frame2.position.z=-1.62;
+  const holder=new THREE.Group(); holder.rotation.z=-0.5; holder.add(reg(top,'sunshield'),reg(under,'sunshield'),reg(frame,'sunshield'),reg(frame2,'sunshield')); gShield.add(holder);
+  strut(gShield,[2.2,-.7,0],[1.0,-1.9,1.2],.035,M.silver,'sunshield'); strut(gShield,[2.2,-.7,0],[1.0,-1.9,-1.2],.035,M.silver,'sunshield');
+}
+
+/* ---------------- KAFES ---------------- */
+const gTruss=eg(new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0));
+{ const xs=[-3.4,-1.7,0,1.7,3.4], yl=-1.8, yu=-1.0, zl=1.25, zu=1.55;
+  for(const z of [zl,-zl]) strut(gTruss,[xs[0],yl,z],[xs[4],yl,z],.04);
+  for(const z of [zu,-zu]) strut(gTruss,[xs[0],yu,z],[xs[4],yu,z],.04);
+  for(const x of xs){ strut(gTruss,[x,yl,zl],[x,yl,-zl]); strut(gTruss,[x,yl,zl],[x,yu,zu]); strut(gTruss,[x,yl,-zl],[x,yu,-zu]); }
+  for(let i=0;i<4;i++){ strut(gTruss,[xs[i],yl,zl],[xs[i+1],yu,zu],.022); strut(gTruss,[xs[i],yu,-zu],[xs[i+1],yl,-zl],.022); strut(gTruss,[xs[i],yl,zl],[xs[i+1],yl,-zl],.02); }
+}
+
+/* ---------------- WFI ---------------- */
+const gWFI=eg(new THREE.Vector3(1.25,0.4,0),new THREE.Vector3(0.5,1.7,0.5));
+let wfiDet;
+{ const box=new THREE.Mesh(new THREE.BoxGeometry(1.3,1.3,1.25),M.gold()); gWFI.add(reg(box,'wfi','outer',true));
+  const rad=new THREE.Mesh(new THREE.BoxGeometry(1.1,.05,1.0),M.foil()); rad.position.y=.72; gWFI.add(reg(rad,'wfi'));
+  const rib=new THREE.Mesh(new THREE.BoxGeometry(1.34,.12,.12),M.goldDk()); rib.position.set(0,-.66,0); gWFI.add(reg(rib,'wfi'));
+  const port=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.15,32).rotateZ(Math.PI/2),M.dark()); port.position.x=-.68; gWFI.add(reg(port,'wfi'));
+  // dedektör mozaiği
+  const det=new THREE.Group(); det.position.set(-.1,0,0); gWFI.add(det); wfiDet=det;
+  const plate=new THREE.Mesh(new THREE.BoxGeometry(.08,.62,1.02),M.dark()); det.add(reg(plate,'wfi_detector','inner'));
+  for(let r=0;r<3;r++)for(let c=0;c<6;c++){ const ch=new THREE.Mesh(new THREE.BoxGeometry(.03,.14,.14),M.chip()); ch.material.color.setHSL(.68+Math.random()*.08,.6,.42);
+    ch.position.set(-.055,(r-1)*.17,(c-2.5)*.16); det.add(reg(ch,'wfi_detector','inner')); }
+}
+
+/* ---------------- CGI ---------------- */
+const gCGI=eg(new THREE.Vector3(2.75,-0.35,0.15),new THREE.Vector3(1.3,-0.9,1.2));
+let cgiDM1;
+{ const box=new THREE.Mesh(new THREE.BoxGeometry(1.0,1.0,1.0),M.gold()); box.material.color.set(0xb8903c); gCGI.add(reg(box,'cgi','outer',true));
+  const lid=new THREE.Mesh(new THREE.BoxGeometry(.9,.04,.9),M.foil()); lid.position.y=.52; gCGI.add(reg(lid,'cgi'));
+  const port=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.14,32).rotateZ(Math.PI/2),M.dark()); port.position.x=-.53; gCGI.add(reg(port,'cgi'));
+  const bench=new THREE.Mesh(new THREE.BoxGeometry(.82,.04,.72),M.silver()); bench.position.y=-.3; gCGI.add(reg(bench,'cgi_optics','inner'));
+  const mk=(x,z,r,rotY)=>{const l=new THREE.Mesh(new THREE.CylinderGeometry(r,r,.04,32).rotateZ(Math.PI/2),M.dm());l.position.set(x,-.1,z);l.rotation.y=rotY;return l;};
+  gCGI.add(reg(mk(-.3,.22,.08,.3),'cgi_optics','inner'), reg(mk(.3,-.22,.08,-.3),'cgi_optics','inner'));
+  const cam=new THREE.Mesh(new THREE.BoxGeometry(.2,.2,.2),M.dark()); cam.position.set(.32,-.18,.25); gCGI.add(reg(cam,'cgi_optics','inner'));
+  cgiDM1=mk(-.12,-.18,.11,.7); gCGI.add(reg(cgiDM1,'cgi_dm1','inner'));
+  const dm2=mk(.14,.14,.11,-.7); gCGI.add(reg(dm2,'cgi_dm2','inner'));
+  for(const d of [cgiDM1,dm2]){const post=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.2,8),M.dark());post.position.set(d.position.x,-.2,d.position.z);gCGI.add(reg(post,d===cgiDM1?'cgi_dm1':'cgi_dm2','inner'));}
+}
+
+/* ---------------- GÖVDE ---------------- */
+const gBus=eg(new THREE.Vector3(4.5,0,0),new THREE.Vector3(2.9,0,0));
+{ const hex=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.7,2.0,6).rotateZ(Math.PI/2),M.gold()); gBus.add(reg(hex,'bus','outer',true));
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.72,.05,10,6).rotateY(Math.PI/2),M.silver()); ring.position.x=1.0; ring.rotation.x=Math.PI/6; gBus.add(reg(ring,'bus'));
+  const ring2=ring.clone(); ring2.material=M.silver(); ring2.position.x=-1.0; gBus.add(reg(ring2,'bus'));
+  for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;const th=new THREE.Mesh(new THREE.ConeGeometry(.08,.22,16).rotateZ(-Math.PI/2),M.dark());th.position.set(1.08,Math.cos(a)*1.2,Math.sin(a)*1.2);gBus.add(reg(th,'bus'));}
+  const tank=new THREE.Mesh(new THREE.SphereGeometry(.62,32,32),M.foil()); gBus.add(reg(tank,'bus_tank','inner'));
+  const wl=[[-.5,.95,.5,0],[-.5,-.95,.5,1],[-.5,0,-1.05,2]];
+  for(const [x,y,z,k] of wl){const w=new THREE.Mesh(new THREE.CylinderGeometry(.26,.26,.1,32),M.dark());w.position.set(x,y,z);w.rotation.set(k===2?Math.PI/2:0,0,k===0?0:Math.PI/2);gBus.add(reg(w,'bus_wheels','inner'));}
+  // anten
+  const dish=new THREE.Mesh(new THREE.CylinderGeometry(.58,.16,.2,40,1,true).rotateZ(-Math.PI/2),M.foil()); dish.material.side=THREE.DoubleSide; dish.position.set(1.45,-.9,1.1); gBus.add(reg(dish,'antenna'));
+  const feed=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.4,8).rotateZ(Math.PI/2),M.dark()); feed.position.set(1.62,-.9,1.1); gBus.add(reg(feed,'antenna'));
+  strut(gBus,[.9,-1.1,1.2],[1.35,-.9,1.1],.03,M.dark,'antenna');
+}
+
+/* ---------------- GÜNEŞ PANELLERİ ---------------- */
+const gSolar=eg(new THREE.Vector3(0.3,-2.6,0.55),new THREE.Vector3(0,-1.8,0));
+{ for(let i=0;i<5;i++){ const x=(i-2)*1.42;
+    const p=new THREE.Mesh(new THREE.BoxGeometry(1.36,1.9,.05),M.panel()); p.position.set(x,0,0); p.rotation.x=-.32; gSolar.add(reg(p,'solar'));
+    const grid=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.36,1.9,4,6)),new THREE.LineBasicMaterial({color:0x5a78c8,transparent:true,opacity:.35})); grid.position.z=.03; p.add(grid);
+    const fr=new THREE.Mesh(new THREE.BoxGeometry(1.42,1.96,.03),M.dark()); fr.position.z=-.02; p.add(reg(fr,'solar')); }
+  strut(gSolar,[-2.9,.95,-.3],[2.9,.95,-.3],.04,M.silver,'solar');
+  for(const x of [-2.1,0,2.1]) strut(gSolar,[x,.95,-.3],[x,1.8,-.55],.03,M.silver,'solar');
+}
+
+/* ---------------- BOYUT ÇİZGİLERİ ---------------- */
+function textSprite(txt,w=3.2){const c=document.createElement('canvas');c.width=1024;c.height=128;const x=c.getContext('2d');
+  x.font='bold 46px Segoe UI, sans-serif';x.fillStyle='#fff';x.textAlign='center';x.textBaseline='middle';x.shadowColor='#000';x.shadowBlur=8;x.fillText(txt,512,64);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));s.scale.set(w,w/8,1);return s;}
+const dimensionLabels=[];
+function dimensionSprite(index,width){const sprite=textSprite(i18n.ui.dimensions[index],width);dimensionLabels.push({sprite,index});return sprite;}
+function translateDimensions(){for(const {sprite,index} of dimensionLabels){const fresh=textSprite(i18n.ui.dimensions[index]);sprite.material.map.dispose();sprite.material.map=fresh.material.map;sprite.material.needsUpdate=true;fresh.material.dispose();}}
+const dims=new THREE.Group(); dims.visible=false; scene.add(dims);
+{ const mat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.8});
+  const L=(a,b)=>dims.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a),new THREE.Vector3(...b)]),mat));
+  L([-7.6,-4.4,0],[5.6,-4.4,0]); L([-7.6,-4.1,0],[-7.6,-4.7,0]); L([5.6,-4.1,0],[5.6,-4.7,0]);
+  const t1=dimensionSprite(0,9); t1.position.set(-1,-4.9,0); dims.add(t1);
+  L([6.6,1.75,0],[6.6,-2.65,0]); L([6.3,1.75,0],[6.9,1.75,0]); L([6.3,-2.65,0],[6.9,-2.65,0]);
+  const t2=dimensionSprite(1,4.5); t2.position.set(7.4,-.45,0); dims.add(t2);
+  const t3=dimensionSprite(2,5); t3.position.set(-0.55,2.0,0); dims.add(t3);
+  L([-0.55,1.25,0],[-0.55,1.75,0]);
+}
+
+/* ---------------- IŞIK YOLU ---------------- */
+const NP=110, photons=[];
+for(let i=0;i<NP;i++) photons.push({ang:Math.random()*Math.PI*2, r:.45+Math.random()*.68, t:Math.random(), cgi:i%2===1});
+const pGeo=new THREE.BufferGeometry();
+pGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(NP*3),3));
+pGeo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(NP*3),3));
+const photonPts=new THREE.Points(pGeo,new THREE.PointsMaterial({size:.17,map:glowTex('rgba(255,255,255,1)','rgba(255,255,255,0)'),vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+photonPts.visible=false; scene.add(photonPts);
+const NRAY=8, nSeg=NRAY*2+3;
+const lGeo=new THREE.BufferGeometry();
+lGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(nSeg*6),3));
+lGeo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(nSeg*6),3));
+const guide=new THREE.LineSegments(lGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.5}));
+guide.visible=false; scene.add(guide);
+const CY=new THREE.Color(0x39c6ff), YE=new THREE.Color(0xffc53d);
+const _v=new THREE.Vector3();
+const wp=o=>o.getWorldPosition(new THREE.Vector3());
+const STEPS_TR=[
+ '<b>1/4</b> Yıldız ışığı paralel ışınlar halinde tüpün açık ucundan girer',
+ '<b>2/4</b> Birincil ayna (2,4 m) ışığı toplayıp öne, ikincil aynaya yansıtır',
+ '<b>3/4</b> İkincil ayna ışığı birincil aynanın ortasındaki delikten geriye gönderir',
+ '<b>4/4</b> Işık ayrılır: <b>Geniş Alan Aleti (mavi)</b> ve <span class="y">Koronagraf (sarı)</span>'];
+const STEPS_EN=[
+ '<b>1/4</b> Starlight enters the open end of the tube as parallel rays',
+ '<b>2/4</b> The primary mirror (2.4 m) collects the light and reflects it forward to the secondary mirror',
+ '<b>3/4</b> The secondary mirror sends the light back through the hole at the center of the primary mirror',
+ '<b>4/4</b> The light splits: <b>Wide Field Instrument (blue)</b> and <span class="y">Coronagraph (yellow)</span>'];
+let STEPS=i18n.language==='en'?STEPS_EN:STEPS_TR;
+let lightOn=false, lastStep=-1;
+function updateLight(dt){
+  const Pp=wp(primaryMesh), Ps=wp(secondaryMesh), Pw=wp(wfiDet), Pc=wp(cgiDM1);
+  const Psplit=Pp.clone().add(_v.set(1.0,0,0));
+  const pos=pGeo.attributes.position.array, col=pGeo.attributes.color.array;
+  let step0=0;
+  for(let i=0;i<NP;i++){const p=photons[i];
+    p.t=(p.t+dt*.16)%1;
+    const entry=Pp.clone().add(_v.set(-.05,Math.cos(p.ang)*p.r,Math.sin(p.ang)*p.r));
+    const start=entry.clone().add(_v.set(-8.5,0,0));
+    const dest=p.cgi?Pc:Pw;
+    const pts=[start,entry,Ps,Psplit,dest];
+    const lens=[];let tot=0;for(let k=0;k<4;k++){const l=pts[k].distanceTo(pts[k+1]);lens.push(l);tot+=l;}
+    let d=p.t*tot,k=0;while(k<3&&d>lens[k]){d-=lens[k];k++;}
+    const q=pts[k].clone().lerp(pts[k+1],d/lens[k]);
+    pos[i*3]=q.x;pos[i*3+1]=q.y;pos[i*3+2]=q.z;
+    const c=(k===3&&p.cgi)?YE:CY; col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;
+    if(i===0)step0=k;
+  }
+  pGeo.attributes.position.needsUpdate=true; pGeo.attributes.color.needsUpdate=true;
+  // kılavuz çizgiler
+  const lp=lGeo.attributes.position.array, lc=lGeo.attributes.color.array; let n=0;
+  const seg=(a,b,c)=>{lp.set([a.x,a.y,a.z,b.x,b.y,b.z],n*6);lc.set([c.r,c.g,c.b,c.r,c.g,c.b],n*6);n++;};
+  for(let i=0;i<NRAY;i++){const a=i/NRAY*Math.PI*2+.3,r=.95;const e=Pp.clone().add(_v.set(-.05,Math.cos(a)*r,Math.sin(a)*r));seg(e.clone().add(_v.set(-8.5,0,0)),e,CY);seg(e,Ps,CY);}
+  seg(Ps,Psplit,CY); seg(Psplit,Pw,CY); seg(Psplit,Pc,YE);
+  lGeo.attributes.position.needsUpdate=true; lGeo.attributes.color.needsUpdate=true;
+  if(step0!==lastStep){lastStep=step0;stepEl.innerHTML=STEPS[step0];}
+}
+
+/* ---------------- ETKİLEŞİM ---------------- */
+const tip=document.getElementById('tip'), panel=document.getElementById('panel'), pc=document.getElementById('pc'), stepEl=document.getElementById('step');
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2(-9,-9);
+let targets=[], inside=false, hover=null, selected=null, moved=false;
+function rebuildTargets(){ targets=[]; for(const id in parts) for(const m of parts[id].meshes){ const u=m.userData;
+  if(u.layer==='both'||(u.layer==='outer'&&!(inside&&u.shell))||(u.layer==='inner'&&inside)) targets.push(m);} }
+rebuildTargets();
+function glow(id,on,strong){ if(!id||!parts[id])return; const inner=isInner(id);
+  for(const m of parts[id].meshes){ const mt=m.material; if(on){mt.emissive.setHex(inner?0xffc53d:0x39c6ff);mt.emissiveIntensity=strong?.6:.35;}else{mt.emissive.setHex(mt.userData.em);mt.emissiveIntensity=mt.userData.emi;} } }
+function setHover(id){ if(id===hover)return; if(hover&&hover!==selected)glow(hover,false); hover=id;
+  if(hover){glow(hover,true,hover===selected);tip.textContent=INFO[hover].name;tip.classList.toggle('inner',isInner(hover));tip.style.opacity=1;canvas.style.cursor='pointer';}
+  else{tip.style.opacity=0;canvas.style.cursor='';} }
+function select(id){ if(selected&&selected!==id)glow(selected,false); selected=id; if(id){glow(id,true,true);openPanel(id);} else panel.classList.remove('open'); }
+let panelId=null;
+function openPanel(id){ panelId=id; const I=INFO[id]; const inner=isInner(id);
+  let h=`<span class="tag ${inner?'y':''}">${I.layer}</span><h2>${I.name}</h2><div class="sub ${inner?'y':''}">${I.sub}</div>`;
+  if(id==='l2')h+=L2SVG();
+  h+=`<p>${I.desc}</p><h4>${i18n.ui.highlights}</h4><ul>${I.facts.map(f=>`<li>${f}</li>`).join('')}</ul>`;
+  const acts=[];
+  if(['barrel','wfi','cgi','bus'].includes(id)&&!inside)acts.push(`<button data-act="inside">${i18n.ui.inside}</button>`);
+  if(['primary','secondary','wfi','cgi','wfi_detector','cgi_dm1','cgi_dm2'].includes(id))acts.push(`<button data-act="light">${i18n.ui.light}</button>`);
+  if(id!=='l2')acts.push(`<button data-act="focus">${i18n.ui.focus}</button>`);
+  if(acts.length)h+=`<div class="act row">${acts.join('')}</div>`;
+  pc.innerHTML=h; panel.classList.add('open');
+  pc.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{const a=b.dataset.act; if(a==='inside')setInside(true); if(a==='light')setLight(true); if(a==='focus')focusOn(id);});
+}
+document.getElementById('close').onclick=()=>select(null);
+canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight*2-1);tip.style.left=e.clientX+'px';tip.style.top=e.clientY+'px';moved=true;});
+canvas.addEventListener('pointerleave',()=>{mouse.set(-9,-9);moved=true;});
+let downAt=null;
+canvas.addEventListener('pointerdown',e=>{downAt=[e.clientX,e.clientY];});
+canvas.addEventListener('pointerup',e=>{ if(!downAt)return; const dx=e.clientX-downAt[0],dy=e.clientY-downAt[1]; downAt=null; if(dx*dx+dy*dy>25)return;
+  if(hover){select(hover);focusOn(hover);} else select(null); });
+
+/* ---------------- KAMERA ---------------- */
+let camTween=null;
+function tweenCam(p1,c1,dur=950){camTween={t0:performance.now(),dur,p0:camera.position.clone(),p1,c0:controls.target.clone(),c1};}
+function focusOn(id){ if(!parts[id])return; scene.updateMatrixWorld(true); const box=new THREE.Box3(); for(const m of parts[id].meshes)box.expandByObject(m);
+  const c=box.getCenter(new THREE.Vector3()), s=box.getSize(new THREE.Vector3()).length();
+  const dir=camera.position.clone().sub(controls.target).normalize(); tweenCam(c.clone().add(dir.multiplyScalar(Math.max(s*2.0,3.2))),c); }
+
+/* ---------------- MODLAR ---------------- */
+const $=id=>document.getElementById(id);
+let explodeTarget=0, explodeCur=0;
+$('explode').oninput=e=>{explodeTarget=e.target.value/100;};
+$('bAssemble').onclick=()=>{explodeTarget=0;$('explode').value=0;};
+$('bExplode').onclick=()=>{explodeTarget=1;$('explode').value=100;};
+function setInside(on){ inside=on; $('bInside').classList.toggle('on',on);
+  for(const m of shells){m.material.transparent=on;m.material.opacity=on?.08:1;m.material.depthWrite=!on;m.material.needsUpdate=true;}
+  for(const e of shellEdges)e.visible=on; rebuildTargets(); setHover(null); moved=true;
+  if(selected&&parts[selected])openPanel(selected); }
+$('bInside').onclick=()=>setInside(!inside);
+function setLight(on){ lightOn=on; $('bLight').classList.toggle('on',on); photonPts.visible=on; guide.visible=on; stepEl.classList.toggle('show',on); lastStep=-1; if(on)$('hint').style.opacity=0; }
+$('bLight').onclick=()=>setLight(!lightOn);
+$('bDims').onclick=()=>{dims.visible=!dims.visible;$('bDims').classList.toggle('on',dims.visible);};
+$('bRot').onclick=()=>{controls.autoRotate=!controls.autoRotate;$('bRot').classList.toggle('on',controls.autoRotate);};
+$('bReset').onclick=()=>{tweenCam(HOME_POS.clone(),HOME_TGT.clone());};
+$('bL2').onclick=()=>{ if(selected)glow(selected,false); selected=null; openPanel('l2'); };
+setTimeout(()=>{$('hint').style.opacity=0;},9000);
+
+window.addEventListener('roman-languagechange',()=>{
+ INFO=i18n.language==='en'?INFO_EN:INFO_TR;
+ STEPS=i18n.language==='en'?STEPS_EN:STEPS_TR;
+ translateDimensions();
+ if(panel.classList.contains('open')&&panelId)openPanel(panelId);
+ if(hover)tip.textContent=INFO[hover].name;
+ if(lastStep>=0)stepEl.innerHTML=STEPS[lastStep];
+});
+
+/* ---------------- DÖNGÜ ---------------- */
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+addEventListener('resize',resize); resize();
+const clock=new THREE.Clock();
+function loop(){ requestAnimationFrame(loop); const dt=Math.min(clock.getDelta(),.05);
+  explodeCur+=(explodeTarget-explodeCur)*Math.min(1,dt*5);
+  for(const g of explodeGroups)g.position.copy(g.userData.base).addScaledVector(g.userData.off,explodeCur);
+  if(camTween){const k=Math.min(1,(performance.now()-camTween.t0)/camTween.dur),e=1-Math.pow(1-k,3);camera.position.lerpVectors(camTween.p0,camTween.p1,e);controls.target.lerpVectors(camTween.c0,camTween.c1,e);if(k>=1)camTween=null;}
+  controls.update();
+  if(moved){moved=false; ray.setFromCamera(mouse,camera); const hit=ray.intersectObjects(targets,false)[0]; setHover(hit?hit.object.userData.partId:null);}
+  if(lightOn)updateLight(dt);
+  renderer.render(scene,camera);
+}
+loop();
+const ld=$('load'); ld.style.opacity=0; setTimeout(()=>ld.remove(),600);
+</script>
+</body>
+</html>
