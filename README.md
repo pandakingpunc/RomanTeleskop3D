@@ -3,7 +3,7 @@
 Nancy Grace Roman Uzay Teleskobu'nun tarayıcıda çalışan, interaktif 3D modeli.
 Tek bir HTML dosyasından oluşur; kurulum ya da derleme gerektirmez.
 
-**Canlı demo:** `https://<kullanici-adi>.github.io/RomanTeleskop3D/` (GitHub Pages açıldıktan sonra)
+**Canlı demo:** https://pandakingpunc.github.io/RomanTeleskop3D/
 
 ## Özellikler
 
