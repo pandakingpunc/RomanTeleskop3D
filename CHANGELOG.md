@@ -35,7 +35,8 @@ Projenin baştan sona yenilendiği sürüm.
 ### Altyapı
 - Tek dosya, okunabilir ES modüllerine bölündü (derleme adımı yok, GitHub Pages ayarı değişmedi).
 - Pil dostu, yalnızca gerektiğinde çizen döngü; cihaza göre otomatik kalite ve gerektiğinde
-  kendiliğinden kalite düşürme.
+  kendiliğinden kalite düşürme. Aynı malzemeli sabit parçalar birleştirilerek kare başına çizim
+  çağrısı yarıya indirildi; Samanyolu dokusu açılıştan sonra boşta üretiliyor.
 - PWA: manifest, ikonlar ve çevrimdışı çalışma için service worker.
 - Erişilebilirlik: klavye kısayolları, ekran okuyucu etiketleri, odak yönetimi, "hareketi azalt" ve
   yüksek kontrast desteği.
