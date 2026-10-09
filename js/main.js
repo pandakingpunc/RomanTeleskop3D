@@ -42,7 +42,11 @@ async function boot() {
     return;
   }
 
-  ui.connect(app);
+  try {
+    ui.connect(app);
+  } catch (error) {
+    console.error(error);
+  }
   requestAnimationFrame(() => ui.hideLoader());
   // Geliştirici araçlarından erişim ve otomatik testler için
   window.romanApp = app;

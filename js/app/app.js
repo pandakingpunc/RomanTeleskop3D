@@ -151,7 +151,9 @@ export async function createApp({ canvas, stage, reducedMotion = false, onProgre
   }
 
   function cycle(step) {
-    const index = PART_ORDER.indexOf(state.selected);
+    let index = PART_ORDER.indexOf(state.selected);
+    // Seçim yokken → ilk parçaya, ← son parçaya gider
+    if (index === -1) index = step > 0 ? -1 : 0;
     const next = PART_ORDER[(index + step + PART_ORDER.length) % PART_ORDER.length];
     select(next, { focus: true, source: 'keyboard' });
   }
@@ -168,7 +170,7 @@ export async function createApp({ canvas, stage, reducedMotion = false, onProgre
     if (on && state.explodeTarget > 0) setExplode(0);
     cutaway.setEnabled(on);
     if (!on && state.light) stopLight();
-    if (!on && state.selected && isInner(state.selected)) select(null);
+    if (!on && state.selected && isInner(state.selected)) select(null, { source: 'system' });
     syncHotspots();
     viewer.requestRender();
     emitState();
@@ -183,6 +185,11 @@ export async function createApp({ canvas, stage, reducedMotion = false, onProgre
     if (state.explodeTarget > 0) {
       if (state.inside) setInside(false);
       if (state.light) stopLight();
+      // Boyut çizgileri birleşik modele aittir
+      if (state.dims) {
+        state.dims = false;
+        dims.setVisible(false);
+      }
     }
     emitState();
   }
@@ -351,6 +358,8 @@ export async function createApp({ canvas, stage, reducedMotion = false, onProgre
 
   /* ------------------------- Kare döngüsü ------------------------- */
   let occlusionTimer = 0;
+  const lastPose = new Float32Array(19);
+  const pose = new Float32Array(19);
   viewer.addFrameHook((dt) => {
     let active = rig.update();
 
@@ -385,10 +394,19 @@ export async function createApp({ canvas, stage, reducedMotion = false, onProgre
     if (light.update(dt)) active = true;
     env.update(camera, renderer.getPixelRatio());
 
+    // Etiket örtülme testi pahalıdır: yalnızca kamera ya da model değiştiyse yap
     occlusionTimer += dt;
     if (state.labels && occlusionTimer > 0.15) {
       occlusionTimer = 0;
-      hotspots.updateOcclusion(camera, targets, cutaway.isClipped);
+      camera.updateMatrixWorld();
+      pose.set(camera.matrixWorld.elements);
+      pose[16] = state.explode;
+      pose[17] = state.deploy;
+      pose[18] = state.inside ? 1 : 0;
+      if (pose.some((v, i) => v !== lastPose[i])) {
+        lastPose.set(pose);
+        hotspots.updateOcclusion(camera, targets, cutaway.isClipped);
+      }
     }
     return active;
   });

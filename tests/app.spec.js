@@ -151,6 +151,60 @@ test.describe('Roman Teleskop 3D', () => {
   });
 });
 
+test.describe('regresyon', () => {
+  test('tur, iç parçadan dış parçaya geçerken kendiliğinden bitmez', async ({ page }) => {
+    await openApp(page);
+    await page.click('.tool[data-action="tour"]');
+    for (let i = 0; i < 6; i++) await page.click('[data-action="player-next"]');
+    await expect(page.locator('#player-count')).toHaveText('7 / 10');
+    await expect.poll(() => page.evaluate(() => window.romanApp.state.selected)).toBe('cgi');
+    await expect(page.locator('#player')).toBeVisible();
+  });
+
+  test('bozuk bir bağlantı yükleme ekranını kilitlemez', async ({ page }) => {
+    await openApp(page, { path: '/#%E0%A4' });
+    await expect(page.locator('.toolbar')).toBeVisible();
+  });
+
+  test('ışık yolu sırasında patlatma anlatımı da kapatır', async ({ page }) => {
+    await openApp(page);
+    await page.click('.tool[data-action="light"]');
+    await expect(page.locator('#player')).toBeVisible();
+    await page.locator('body').press('e');
+    await expect(page.locator('#player')).toBeHidden();
+    await expect(page.locator('.tool[data-action="light"]')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('seçim yokken ← son parçayı seçer', async ({ page }) => {
+    await openApp(page);
+    await page.locator('body').press('ArrowLeft');
+    await expect.poll(() => page.evaluate(() => window.romanApp.state.selected)).toBe('antenna');
+  });
+
+  test('atlama bağlantısı açık parça listesini kapatmaz', async ({ page }) => {
+    await openApp(page);
+    await page.click('.tool[data-action="parts"]');
+    await page.locator('.skip-link').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#parts-panel')).toBeVisible();
+  });
+
+  test('patlatma boyut çizgilerini kapatır', async ({ page }) => {
+    await openApp(page);
+    await page.locator('body').press('m');
+    await expect(page.locator('.tool[data-action="dims"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('body').press('e');
+    await expect(page.locator('.tool[data-action="dims"]')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('?lang= adresi dil değişince güncellenir', async ({ page }) => {
+    await openApp(page, { path: '/?lang=en' });
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await page.click('[data-lang="tr"]');
+    await expect(page).toHaveURL(/\?lang=tr/);
+  });
+});
+
 test.describe('proje bütünlüğü', () => {
   test('service worker önbellek listesindeki dosyalar mevcut', () => {
     const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');

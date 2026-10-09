@@ -61,6 +61,12 @@ export function setLanguage(lang) {
   if (!LANGUAGES.includes(lang) || lang === current) return;
   current = lang;
   try { localStorage.setItem(STORAGE_KEY, lang); } catch { /* yok say */ }
+  // Adreste ?lang= varsa onu da güncelle; yoksa yenileme ve paylaşım eski dili geri getirir
+  const url = new URL(location.href);
+  if (url.searchParams.has('lang')) {
+    url.searchParams.set('lang', lang);
+    history.replaceState(history.state, '', url);
+  }
   applyDocument();
   window.dispatchEvent(new CustomEvent(EVENT, { detail: { lang } }));
 }

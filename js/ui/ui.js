@@ -10,6 +10,8 @@ import { createPlayer } from './player.js';
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const isSmall = () => matchMedia('(max-width: 900px)').matches;
+// Kullanıcının kendisinin yaptığı seçimler (tur gibi otomatik akışları sonlandırır)
+const USER_SOURCES = new Set(['pointer', 'hotspot', 'list', 'keyboard', 'panel', 'url']);
 
 export function createUI() {
   const els = {
@@ -161,10 +163,7 @@ export function createUI() {
     els.parts.hidden = !open;
     if (open) {
       renderPartsList();
-      if (isSmall()) {
-        els.info.hidden = true;
-        info = null;
-      }
+      if (isSmall()) closeInfo();
       if (keyboardMode) ($('[aria-current="true"]', els.partsList) ?? $('.part-item', els.partsList))?.focus();
     }
     updateSheetState();
@@ -254,7 +253,12 @@ export function createUI() {
   }
 
   function applyHash() {
-    const hash = decodeURIComponent(location.hash.slice(1));
+    let hash;
+    try {
+      hash = decodeURIComponent(location.hash.slice(1));
+    } catch {
+      return false; // bozuk bağlantı: varsayılan görünümle devam et
+    }
     if (!hash) return false;
     const [key, value] = hash.split('=');
     if (key === 'part' && PARTS[value]) {
@@ -332,6 +336,7 @@ export function createUI() {
     deploy: () => toggleSequence('deploy'),
     parts: () => toggleParts(),
     'parts-close': () => toggleParts(false),
+    'parts-open': () => toggleParts(true),
     inside: () => app.setInside(!app.state.inside),
     dims: () => app.setDims(!app.state.dims),
     labels: () => app.setLabels(!app.state.labels),
@@ -508,6 +513,7 @@ export function createUI() {
     app.on('state', (s) => {
       syncToolbar();
       syncExplode(s.explodeTarget);
+      if (player.kind === 'light' && !s.light) player.stop();
       if (s.inside !== lastInside) {
         lastInside = s.inside;
         if (info?.kind === 'part') renderInfo();
@@ -515,7 +521,7 @@ export function createUI() {
     });
 
     app.on('select', ({ id, source }) => {
-      if (source !== 'tour' && player.kind === 'tour') {
+      if (USER_SOURCES.has(source) && player.kind === 'tour') {
         // Kullanıcı tur sırasında kendisi bir parça seçti: turu bitir, seçimi koru
         tourOwnsSelection = false;
         player.stop();
