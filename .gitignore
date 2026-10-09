@@ -13,3 +13,7 @@ desktop.ini
 *.tmp
 .claude/
 node_modules/
+
+# Test çıktıları
+test-results/
+playwright-report/
