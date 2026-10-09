@@ -225,6 +225,29 @@ test.describe('proje bütünlüğü', () => {
     }
   });
 
+  test('kullanılan tüm three.js eklentileri (bağımlılıklarıyla) çevrimdışı önbellekte', () => {
+    const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+    const listed = new Set([...sw.matchAll(/'((?:build|examples)\/[^']+)'/g)].map((m) => m[1]));
+    const threeRoot = path.join(root, 'node_modules/three');
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]));
+    const needed = new Set(['build/three.module.js']);
+    const queue = walk(path.join(root, 'js'))
+      .flatMap((file) => [...fs.readFileSync(file, 'utf8').matchAll(/from 'three\/addons\/([^']+)'/g)])
+      .map((m) => `examples/jsm/${m[1]}`);
+    queue.push('build/three.module.js');
+    while (queue.length) {
+      const rel = queue.pop();
+      needed.add(rel);
+      const src = fs.readFileSync(path.join(threeRoot, rel), 'utf8');
+      for (const m of src.matchAll(/(?:import|export)[^'"]*?from\s*['"]([^'"]+)['"]/g)) {
+        const spec = m[1];
+        const dep = spec === 'three' ? 'build/three.module.js' : spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(rel), spec)) : null;
+        if (dep && !needed.has(dep)) queue.push(dep);
+      }
+    }
+    for (const rel of needed) expect(listed.has(rel), rel).toBe(true);
+  });
+
   test('node_modules içindeki three sürümü importmap ile aynı', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'node_modules/three/package.json'), 'utf8'));
     expect(pkg.version).toBe(THREE_VERSION);

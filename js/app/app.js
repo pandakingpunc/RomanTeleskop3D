@@ -463,6 +463,13 @@ export async function createApp({ canvas, stage, reducedMotion = false, onProgre
   controls.update();
   onProgress?.(0.95);
 
+  // Samanyolu arka planını ilk karelerden sonra, ana iş parçacığı boşaldığında üret
+  const idle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 400));
+  idle(() => {
+    env.loadSky();
+    viewer.requestRender();
+  }, { timeout: 3000 });
+
   return {
     events,
     on(type, fn) { events.addEventListener(type, (e) => fn(e.detail)); },

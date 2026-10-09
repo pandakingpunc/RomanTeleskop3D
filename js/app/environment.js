@@ -117,11 +117,13 @@ export function createEnvironment({ scene, renderer }) {
   room.dispose?.();
   pmrem.dispose();
 
-  // Gökyüzü: Samanyolu dokusu sahne arka planı olarak
-  const milkyWay = createMilkyWayTexture();
-  scene.background = milkyWay;
+  // Gökyüzü: Samanyolu dokusu ilk kareden sonra (boşta) üretilir; açılış hızlansın diye
+  scene.background = new THREE.Color(0x020309);
   scene.backgroundIntensity = 0.42;
   scene.backgroundRotation.set(0.5, 0.9, 0.35);
+  function loadSky() {
+    scene.background = createMilkyWayTexture();
+  }
 
   const sky = new THREE.Group();
   sky.name = 'sky';
@@ -223,5 +225,5 @@ export function createEnvironment({ scene, renderer }) {
     bodies.visible = visible;
   }
 
-  return { sun, fill, rim, hemi, sky, stars, bodies, earth, moon, update, setBodiesVisible };
+  return { sun, fill, rim, hemi, sky, stars, bodies, earth, moon, update, setBodiesVisible, loadSky };
 }

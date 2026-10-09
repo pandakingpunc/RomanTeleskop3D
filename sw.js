@@ -53,6 +53,7 @@ const CDN_FILES = [
   'examples/jsm/shaders/CopyShader.js',
   'examples/jsm/shaders/LuminosityHighPassShader.js',
   'examples/jsm/shaders/OutputShader.js',
+  'examples/jsm/utils/BufferGeometryUtils.js',
 ].map((file) => CDN_PREFIX + file);
 
 self.addEventListener('install', (event) => {

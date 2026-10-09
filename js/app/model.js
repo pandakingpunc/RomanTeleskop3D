@@ -4,6 +4,7 @@
 // Eksenler: X = optik eksen (açıklık -X yönünde), Y = Güneş'e bakan taraf
 // (güneş paneli kalkanı), Z = Geniş Alan Aleti tarafı.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const SQRT3 = Math.sqrt(3);
 
@@ -312,6 +313,7 @@ export function buildObservatory(materials) {
       geo.addGroup(0, 3, 0);
       geo.addGroup(3, 3, 1);
       const flap = mesh(dacGroup, geo, 'dac', ['mli', 'absorber'], { shell: true, side: THREE.FrontSide });
+      flap.userData.dynamic = true;
       rig.dacFlaps.push({ flap, side, geo });
     }
     const tip = new THREE.Object3D();
@@ -814,6 +816,50 @@ export function buildObservatory(materials) {
     }
   }
 
+  /**
+   * Aynı gruptaki, aynı malzemeyi kullanan sabit ağları tek bir ağda birleştirir.
+   * Görünüm değişmez; çizim çağrısı sayısı (özellikle telefonlarda) belirgin biçimde azalır.
+   */
+  function batchStatic() {
+    const buckets = new Map();
+    root.traverse((obj) => {
+      if (!obj.isMesh || obj.userData.dynamic || Array.isArray(obj.material) || obj.children.length) return;
+      const key = `${obj.parent.uuid}|${obj.material.uuid}|${obj.castShadow}|${obj.receiveShadow}|${obj.renderOrder}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(obj);
+    });
+    for (const list of buckets.values()) {
+      if (list.length < 2) continue;
+      const geometries = list.map((m) => {
+        m.updateMatrix();
+        const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+        g.clearGroups();
+        for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+        return g.applyMatrix4(m.matrix);
+      });
+      const merged = mergeGeometries(geometries, false);
+      geometries.forEach((g) => g.dispose());
+      if (!merged) continue;
+      const first = list[0];
+      const batched = new THREE.Mesh(merged, first.material);
+      batched.userData = { ...first.userData };
+      batched.castShadow = first.castShadow;
+      batched.receiveShadow = first.receiveShadow;
+      batched.renderOrder = first.renderOrder;
+      first.parent.add(batched);
+      const part = parts.get(first.userData.partId);
+      for (const m of list) {
+        m.parent.remove(m);
+        m.geometry.dispose();
+        part.meshes.splice(part.meshes.indexOf(m), 1);
+        const s = shells.indexOf(m);
+        if (s >= 0) shells.splice(s, 1);
+      }
+      part.meshes.push(batched);
+      if (batched.userData.shell) shells.push(batched);
+    }
+  }
+
   let deployState = 1;
   /** 0 = fırlatma (katlı) durumu, 1 = tamamen açılmış. */
   function setDeploy(t) {
@@ -841,6 +887,7 @@ export function buildObservatory(materials) {
 
   setDeploy(1);
   setExplode(0);
+  batchStatic();
   root.updateMatrixWorld(true);
 
   return {

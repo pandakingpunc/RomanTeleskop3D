@@ -53,7 +53,7 @@ function finish(texture, { srgb = false, repeat = 1, anisotropy = 4 } = {}) {
  * Buruşuk çok katmanlı yalıtım (MLI) folyosu için normal haritası.
  * "Sırtlı" gürültü katmanları folyonun kırışıklıklarını taklit eder.
  */
-export function createCrinkleNormalMap(size = 512, seed = 7) {
+export function createCrinkleNormalMap(size = 384, seed = 7) {
   const random = rng(seed);
   const octaves = [
     { period: 6, amp: 1.0 },
@@ -224,7 +224,7 @@ export function createGlowTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(2
  * Samanyolu: eşdikdörtgen (equirectangular) gökyüzü dokusu.
  * Galaksi düzlemi boyunca yumuşak bir ışık bandı ve toz şeritleri çizer.
  */
-export function createMilkyWayTexture(width = 1024, height = 512, seed = 3) {
+export function createMilkyWayTexture(width = 768, height = 384, seed = 3) {
   const random = rng(seed);
   const n1 = tileableNoise(8, random);
   const n2 = tileableNoise(16, random);
